@@ -1,0 +1,2 @@
+node flexbot.js
+pause

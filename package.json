@@ -1,0 +1,20 @@
+{
+  "name": "FlexBot",
+  "version": "1.0.0",
+  "description": "Test Bot by Flexi",
+  "main": "flexbot.js",
+  "author": "Flexi",
+  "dependencies": {
+    "bufferutil": "^4.0.0",
+    "cheerio": "^1.0.0-rc.2",
+    "discord.io": "https://github.com/woor/discord.io/tarball/gateway_v6",
+    "discord.js": "^11.4.2",
+    "google-images": "^2.1.0",
+    "libsodium-wrappers": "^0.7.3",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.2",
+    "sqlite3": "^4.1.1",
+    "uws": "^9.14.0",
+    "winston": "^3.1.0"
+  }
+}
