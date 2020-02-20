@@ -96,14 +96,22 @@ bot.on("message", message => {
     }
 
     // Troll Section, Feel free to add more :>
-    if(eastereggsEnabled){
+    if(eastereggsEnabled && !message.author.bot){
         if(message.content.toLowerCase().includes("brot")){
             message.channel.send(brotCode);
         } else if(message.content.toLowerCase().includes("lol")){
             message.channel.send("LOOOOL, hahahaha so lustig!! :'D");
-        } else if(message.content.toLowerCase().includes("uwu") && !message.content.includes(uwuCode)){
-            message.channel.send(uwuCode);
-        } 
+        } else if(message.content.toLowerCase().includes("uwu")){
+            message.channel.send(uwuCode); 
+        } else if(message.content.toLowerCase().includes("❤️") || message.content.toLowerCase().includes("<3")){
+            log(message.content);
+            if(message.content.includes("<@!507844825224052756>") || message.content.toLowerCase().includes("flex")){
+                message.channel.send("Danke!! Luv you too ❤️"); 
+            } else {
+                message.channel.send("Will auch etwas liebe 😥"); 
+            }
+            
+        }
     }
 });
 
