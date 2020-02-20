@@ -1,5 +1,5 @@
 class UserClass {
-  constructor(numPlayer, numClass, id, uid, tag, nick, clas, spec, short, fullname, role) {
+  constructor(numPlayer, numClass, id, uid, tag, nick, clas, spec, short, role) {
     this.numPlayer = numPlayer;
     this.numClass = numClass;
     this.id = id;
@@ -9,7 +9,6 @@ class UserClass {
     this.clas = clas;
     this.spec = spec;
     this.short = short;
-    this.fullname = fullname;
     this.role = role;
     this.status = 0;
   }

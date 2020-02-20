@@ -1,18 +1,38 @@
 const Discord = require('discord.js');
 var auth = require('./auth.json');
+const bot = new Discord.Client({ token: auth.token });
 var sqlite3 = require('sqlite3').verbose();
-
-var dbhelper = require('./db/dbhelper.js');
 let Raid = require('./raid.js');
 let UserClass = require('./userclass.js');
-var raid = null;
-const bot = new Discord.Client({
-    token: auth.token
-});
+const GoogleImages = require('google-images');
+const client = new GoogleImages('004926251727705948840:xhe9drwd6di', 'AIzaSyDuKIWAiRUyEUcp0qn_c82sxOcmwZjy8Hg');
 
 const botName = "FlexBot";
-
+const botSayHello = false;
+const version = "0.1";
 const debugMode = true;
+const prefix = '$f ';
+var raid = null;
+var authors = {
+    flex : "FL3x#1337",
+    riku : "Riku#1234"
+};
+
+// Not beeing used yet --> Move to database --> make configurable?
+var roles = {
+    raidLead : "<Discord-Rolle-Raidlead>",
+    raidMember : "<Discord-Rolle-Raidmember>"
+}
+
+// Not beeing used yet  --> Move to database --> make configurable?
+var channels = {
+    botChannel : "<Discord-Bot-Channel>"
+}
+
+// Eastereggs (shhhh)
+const brotCode = "<:bread:680073323220172807>";
+const uwuCode = "<:uwu:680073353020964914>";
+const eastereggsEnabled = true; 
 
 var db = new sqlite3.Database('./db/data.db', (e) => {
   if (e) {
@@ -29,14 +49,13 @@ bot.on('ready', function (evt) {
     console.log(`${botName} is ready!`);
     console.log('---------------------------------------');
 });
+bot.login("NTA3ODQ0ODI1MjI0MDUyNzU2.XkPpbg.BDRj-QV8pF9VL6F08OF71O_-KV4");
 
-var prefix = '$f ';
+
 bot.on("message", message => {
-
     if (message.content.substring(0, 3) == prefix) {
         var args = message.content.substring(3).split(' ');
-        var cmd = args[0];
-       
+        var cmd = args[0];  
         args = args.splice(1);
         switch(cmd) {
             case 'ping':
@@ -55,6 +74,9 @@ bot.on("message", message => {
             case 'classes':
                 cmd_classes(message);
             break;
+            case 'userclasses':
+                cmd_userclasses(args, message);
+            break;
             case 'me':
                 cmd_me(args, message);
             break;
@@ -64,20 +86,26 @@ bot.on("message", message => {
             case 'easteregg':
                 message.channel.send("https://encrypted-tbn0.gstatic.com/images?q=tbn%3AANd9GcRhWMRJqt1B42E3VIoAj5-wwbC2YAVphy9uH9vFdU2N2OYk5TuW");
             break;
+            case 'image':
+            	cmd_image(args, message, null);
+            break;
+            case 'meme':
+            	cmd_image(args, message, "meme");	
+            break;
         }
     }
 
-})
-
-bot.login("NTA3ODQ0ODI1MjI0MDUyNzU2.XkPpbg.BDRj-QV8pF9VL6F08OF71O_-KV4");
-
-
-function log(message){
-    if(debugMode){
-        console.log(message);
+    // Troll Section, Feel free to add more :>
+    if(eastereggsEnabled){
+        if(message.content.toLowerCase().includes("brot")){
+            message.channel.send(brotCode);
+        } else if(message.content.toLowerCase().includes("lol")){
+            message.channel.send("LOOOOL, hahahaha so lustig!! :'D");
+        } else if(message.content.toLowerCase().includes("uwu") && !message.content.includes(uwuCode)){
+            message.channel.send(uwuCode);
+        } 
     }
-}
-
+});
 
 function cmd_raid(args, message){
     if(args.length > 0){
@@ -89,10 +117,10 @@ function cmd_raid(args, message){
         } else {
             message.channel.send({embed: {
                 color: 3447003,
-                title: "Your command was invalid. Available commands are:",
+                title: "Dein Command war ungültig. Verfügbare Commands:",
                 fields: [
                     { name: "Command", value: "$f raid\n$f raid open", inline: true},
-                    { name: "Description", value: "Shows your currently open raid\nOpens a new raid. Careful! Only one raid can be open at the moment! This will close all open raids.", inline: true}
+                    { name: "Description", value: "Zeigt den aktuell offenen Raid\nÖffnet einen neuen Raid. Achtung! Es gibt immer nur einen Raid; ein anderer offener Raid wird geschlossen!", inline: true}
                 ]}
             });
         }
@@ -106,14 +134,14 @@ function cmd_raid(args, message){
 function openRaid(message){
     raid = new Raid(message.member.user);
 
-    db.all('SELECT uc.id AS id, u.uid AS uid,u.name AS tag,u.nick AS nick, c.class, c.name AS fullname, c.specialization AS spec, c.short AS short '
+    db.all('SELECT uc.id AS id, u.uid AS uid,u.name AS tag,u.nick AS nick, c.class, c.specialization AS spec, c.short AS short, c.role AS role '
                 + 'FROM users AS u '
                 + 'JOIN userclasses as uc ON u.id = uc.user '
                 + 'JOIN classes AS c ON uc.class = c.id '
                 + 'ORDER BY tag', function(err, rows){
         if (err) {
             log(err.message);
-            message.channel.send("Something went wrong! :(");
+            message.channel.send("Derp. Irgendwas lief schief :(");
         }
 
         var numClass = 1;
@@ -125,7 +153,7 @@ function openRaid(message){
                 numClass = 1;
                 numPlayer = numPlayer + 1;
             }
-            let uc = new UserClass(numPlayer, numClass, row.id, row.uid, row.tag, row.nick, row.class, row.spec, row.short, row.fullname);
+            let uc = new UserClass(numPlayer, numClass, row.id, row.uid, row.tag, row.nick, row.class, row.spec, row.short, row.role);
             raid.addAvailableMember(uc);   
             numClass = numClass + 1;     
         });
@@ -134,7 +162,7 @@ function openRaid(message){
         var oldmsg = null;
         raid.status = 1;
         message.channel.send("Wann soll der Raid starten?").then(sentMessage => {
-                oldmsg = sentMessage;
+            oldmsg = sentMessage;
         })
         const collector = new Discord.MessageCollector(message.channel, m => m.author.id === message.author.id, { time: 300000 });
         collector.on('collect', message => {
@@ -177,6 +205,7 @@ function openRaid(message){
                 break;
             }
         });
+
         collector.on('end', (collected, reason) => {
             log("Raid Status: 4 | Picking Members");
             if(reason != null){
@@ -188,30 +217,20 @@ function openRaid(message){
                 }
             }
         });
-
     });
+}
 
-
-
-    /* Process
-
-    1) Ask for time (free input)
-    2) Show empty raid
-    3) Show list of available userclasses
-    4) Ask for number inputs
-
-    5) After number input detected by raidlead:
-        a) Add userclass to raid
-        b) Show updated raid
-        c) Show list of available userclasses 
-
-
-    */
-
-
-
-    // When done
-    //showOpenRaid(message);
+function createEmbed(title, description, author){
+	var userclassesEmbed = new Discord.RichEmbed()
+        .setColor('#0099ff')
+        .setTitle(title)
+        .setURL('https://snowcrows.com/')
+        .setAuthor(`${botName}`)
+        .setDescription(description)
+        .setThumbnail('https://i.imgur.com/wSTFkRM.png')
+        .setTimestamp()
+        .setFooter(`${botName} - v${version} - ${author}`, 'https://i.imgur.com/wSTFkRM.png');
+    return userclassesEmbed;
 }
 
 function showAvailableUserClasses(message){
@@ -222,15 +241,10 @@ function showAvailableUserClasses(message){
     if(raid.message == null && raid.availableMembersCount == 0){
         message.channel.send("Noone has registered a class yet.");
     } else {
-
-        var userclassesEmbed = new Discord.RichEmbed()
-            .setColor('#0099ff')
-            .setTitle("Verfügbare Mitglieder/Klassen")
-            .setURL('https://snowcrows.com/')
-            .setAuthor('FlexBot')
-            .setDescription('Hier die zur Auswahl stehenden Klassen!\nWähle sie, indem du die Spieler und Klassenzahl angibst.\n Bsp. 2.4')
-            .setThumbnail('https://i.imgur.com/wSTFkRM.png')
-
+    	var userclassesEmbed = createEmbed(
+    		"Verfügbare Mitglieder/Klassen", 
+    		"Hier die zur Auswahl stehenden Klassen!\nWähle sie, indem du die Spieler und Klassenzahl angibst.\n Bsp. 2.4",
+    		authors.flex);
 
         let tag = "";
         let value = "";
@@ -243,7 +257,7 @@ function showAvailableUserClasses(message){
                 // go get all values for that member
                 raid.availableMembers.forEach(function (m) {
                     if(m.tag == tag){
-                        value += `(${m.numPlayer}.${m.numClass}) ${m.short} - ${m.fullname}\n`;
+                        value += `(${m.numPlayer}.${m.numClass}) ${m.short} - ${m.role} ${m.spec}\n`;
                     }
                 });
 
@@ -255,18 +269,15 @@ function showAvailableUserClasses(message){
         // List selected
         var members = "";
         raid.members.forEach(function (m) {
-            members += `${m.tag} - ${m.short} - ${m.fullname}\n`;    
+            members += `${m.tag} - ${m.short} - ${m.role} ${m.spec}\n`;    
         });
 
         if(members == ""){
             members = "Keine Mitglieder gewählt";
         }
 
-        userclassesEmbed.addField("Ausgewählte Mitglieder", members);   
-
-        userclassesEmbed.setTimestamp()
-        .setFooter('FlexBot v0.1', 'https://i.imgur.com/wSTFkRM.png');
-
+        userclassesEmbed.addField("__**Ausgewählte Mitglieder**__", members);   
+        userclassesEmbed.addField("Du bist fertig?", 'Publiziere den Raid mit "$f raid publish"!');
         if(raid.message == null){
             // New message
             message.channel.send(userclassesEmbed).then(sentMessage => {
@@ -276,7 +287,6 @@ function showAvailableUserClasses(message){
             // Update old list
             raid.message.edit(userclassesEmbed);
         }
-        
     }
 }
 
@@ -299,7 +309,7 @@ function processRaidMembers(message){
             });
 
             if(member == null){
-                message.channel.send("No Userclass found with input: " + message.content); 
+                message.channel.send("Keine registrierte Benutzerklasse gefunden mit: " + message.content); 
             } else {
 
                 // Moves member to selected
@@ -331,10 +341,107 @@ function showOpenRaid(message){
     if(raid != null){
         message.channel.send(`Info about open raid`); 
     } else {
-        message.channel.send(`something went wrong. No open raid could be found!`); 
+        message.channel.send(`Something went wrong. No open raid could be found!`); 
     }
 }
 
+
+function cmd_userclasses(args, message){
+    if(args > 0){
+        showUserClassesFrom(args, message);
+    } else {
+        showAllUserClasses(message);
+    }
+}
+
+function showAllUserClasses(message){
+    log("showAllUserClasses()");
+    db.all('SELECT uc.id AS id, u.uid AS uid,u.name AS tag,u.nick AS nick, c.class, c.specialization AS spec, c.short AS short, c.role AS role '
+                + 'FROM users AS u '
+                + 'JOIN userclasses as uc ON u.id = uc.user '
+                + 'JOIN classes AS c ON uc.class = c.id '
+                + 'ORDER BY tag', function(err, rows){
+        if (err) {
+            log(err.message);
+            message.channel.send("Derp. Irgendwas lief schief :(");
+        }
+
+        var userclassesEmbed = createEmbed(
+            "Verfügbare Mitglieder/Klassen", 
+            "Hier alle derzeit registrierten Benutzerklassen.",
+            authors.flex);
+
+        var userclasses = [];
+
+        // Get all users from DB and store them temporarely
+        rows.forEach(function (row) {
+            userclasses.push(new UserClass(0, 0, row.id, row.uid, row.tag, row.nick, row.class, row.spec, row.short, row.role));   
+        });
+
+        // Build and add data
+        let tag = "";
+        let value = "";
+        // List comes sorted by user tags
+        userclasses.forEach(function (ucl) {
+            // If the tag changes
+            if(tag != ucl.tag){
+                value = ""; // Reset value
+                tag = ucl.tag; // change tag
+                // go get all values for that member
+                userclasses.forEach(function (uc) {
+                    if(uc.tag == tag){
+                        value += `${uc.short} - ${uc.role} ${uc.spec}\n`;
+                    }
+                });
+                // Add data to embed
+                userclassesEmbed.addField("__**" + (tag == authors.flex ? tag + " (Top DPS)" : tag) + "**__", value);       
+            } 
+        });
+               
+        if(tag == ""){
+            message.channel.send("Es wurden noch keine Benutzerklassen registriert.");
+        } else {
+            message.channel.send(userclassesEmbed);
+        }  
+    }); 
+}
+
+function showUserClassesFrom(user, message){
+    log("showUserClassesFrom()");
+    db.all('SELECT uc.id AS id, u.uid AS uid,u.name AS tag,u.nick AS nick, c.class, c.specialization AS spec, c.short AS short, c.role AS role '
+                + 'FROM users AS u '
+                + 'JOIN userclasses as uc ON u.id = uc.user '
+                + 'JOIN classes AS c ON uc.class = c.id '
+                + 'WHERE tag == ? OR nick == ?'
+                + 'ORDER BY tag', [user,user], function(err, rows){
+        if (err) {
+            log(err.message);
+            message.channel.send("Derp. Irgendwas lief schief :(");
+        }
+
+        var userclassesEmbed = createEmbed(
+            `${user}'s registrierte Klassen`, 
+            `Hier alle derzeit registrierten Benutzerklassen von ${user}.`,
+            authors.flex);
+
+        let tag = "";
+        let value = "";
+
+        rows.forEach(function (uc) {
+            if(tag == ""){
+                tag = uc.tag;
+            }
+            value += `${uc.short} - ${uc.role} ${uc.spec}\n`;
+        });
+        userclassesEmbed.addField("__**" + (tag == authors.flex ? tag + " (Top DPS)" : tag) + "**__", value);  
+  
+        if(tag == ""){
+            message.channel.send("Es wurden noch keine Benutzerklassen registriert.");
+        } else {
+            message.channel.send(userclassesEmbed);
+        }  
+    }); 
+}
 
 function cmd_me(args, message){
     if(args.length > 0){
@@ -345,18 +452,17 @@ function cmd_me(args, message){
             } else {
                 message.channel.send({embed: {
                     color: 3447003,
-                    title: "Your command was invalid. Please use '$f me add <short>':",
+                    title: "Dein Command ist ungültig. Bitte benutze '$f me add <Kürzel>':",
                     fields: [
                         { name: "Command", value: "$f me\n$f me add\n$f me remove", inline: true},
-                        { name: "Description", value: "Shows your registered classes\nAdd a new class\nRemove a class", inline: true}
+                        { name: "Beschreibung", value: "Zeigt deine registrierten Klassen\nfüge eine Klasse hinzu\nEntferne eine Klasse", inline: true}
                     ]}
                 });
             }
         }
-        
     } else {
         // Show User's classes
-        db.all('SELECT u.uid AS uid,u.name AS tag,u.nick AS nick, c.class, c.name AS fullname, c.specialization AS spec, c.short AS short, c.role AS role '
+        db.all('SELECT u.uid AS uid,u.name AS tag,u.nick AS nick, c.class, c.specialization AS spec, c.short AS short, c.role AS role '
                 + 'FROM users AS u '
                 + 'JOIN userclasses as uc ON u.id = uc.user '
                 + 'JOIN classes AS c ON uc.class = c.id '
@@ -366,61 +472,38 @@ function cmd_me(args, message){
             var tags = "";
             var nicks = "";
             var classes = "";
-            var fullnames = "";
             var specs = "";
             var shorts = "";
             var roles = "";
             if (err) {
                 log(err.message);
-                message.channel.send("Something went wrong! :(");
+                message.channel.send("Etwas ist schiefgelaufen:(");
             }
+
+            var userclassesEmbed = createEmbed(
+            	`${message.member.user.username}'s verfügbare Klassen`,
+                "Deine hinterlegten Klassen:",
+                authors.flex);   
 
             if(rows.length == 0){
-                console.log("empteeey");
-                var userclassesEmbed = new Discord.RichEmbed()
-                .setColor('#0099ff')
-                .setTitle(message.member.user.username + "'s Verfügbare Klassen")
-                .setURL('https://snowcrows.com/')
-                .setAuthor('FlexBot')
-                .setDescription('Deine hinterlegten Klassen:')
-                .setThumbnail('https://i.imgur.com/wSTFkRM.png')
-                .addField('Keine Klassen', 'Es wurden noch keine Klassen hinterlegt.')
-                .addBlankField()
+                userclassesEmbed.addField('Keine Klassen', 'Es wurden noch keine Klassen hinterlegt.')
                 .addField('Wie hinterlege ich meine Klassen?', "Benutze den Command '$f me add <Kürzel>'. Die Kürzel findest du mit '$f classes'.")
-                //.setImage('https://i.imgur.com/wSTFkRM.png')
-                .setTimestamp()
-                .setFooter('FlexBot v0.1', 'https://i.imgur.com/wSTFkRM.png');
-                message.channel.send(userclassesEmbed);
-
             } else {
                 rows.forEach(function (row) {
-                    uids += row.uid + "\n";
-                    tags +=  row.tag + "\n";
-                    nicks += row.nick + "\n";
-                    classes += row.class + "\n";
-                    fullnames += row.fullname + "\n";
-                    specs += row.spec + "\n";
-                    shorts += row.short + "\n";
-                    roles += row.role + "\n";
+	                   uids += row.uid + "\n";
+	                   tags +=  row.tag + "\n";
+	                   nicks += row.nick + "\n";
+	                   classes += row.class + "\n";
+	                   specs += row.spec + "\n";
+	                   shorts += row.short + "\n";
+	                   roles += row.role + "\n";
                 });
-
-                var userclassesEmbed = new Discord.RichEmbed()
-                .setColor('#0099ff')
-                .setTitle(message.member.user.username + "'s Verfügbare Klassen")
-                .setURL('https://snowcrows.com/')
-                .setAuthor('FlexBot')
-                .setDescription('Deine hinterlegten Klassen:')
-                .setThumbnail('https://i.imgur.com/wSTFkRM.png')
-                .addField('Spezialisierung', specs, true)
+                userclassesEmbed.addField('Spezialisierung', specs, true)
                 .addField('Rolle', roles, true)
                 .addField('Kürzel', shorts, true)
-                //.setImage('https://i.imgur.com/wSTFkRM.png')
-                .setTimestamp()
-                .setFooter('FlexBot v0.1', 'https://i.imgur.com/wSTFkRM.png');
+               }
 
-                message.channel.send(userclassesEmbed);
-            }
-
+            message.channel.send(userclassesEmbed);
         });
     }
 }
@@ -521,23 +604,47 @@ function cmd_classes(message){
         });
 
         // inside a command, event listener, etc.
-        var exampleEmbed = new Discord.RichEmbed()
-        .setColor('#0099ff')
-        .setTitle('Verfügbare Klassen')
-        .setURL('https://snowcrows.com/')
-        .setAuthor('FlexBot')
-        .setDescription('Alle verfügbaren Klassen. Tragt eure Klassen mit "$f me add <Kürzel>" ein.')
-        .setThumbnail('https://i.imgur.com/wSTFkRM.png')
-
+        var classesEmbed = createEmbed('Verfügbare Klassen', 'Alle verfügbaren Klassen. Tragt eure Klassen mit "$f me add <Kürzel>" ein.', authors.flex)
         .addField('Spezialisierung', specs, true)
         .addField('Rolle', roles, true)
-        .addField('Kürzel', shorts, true)
-        //.setImage('https://i.imgur.com/wSTFkRM.png')
-        .setTimestamp()
-        .setFooter('FlexBot v0.1', 'https://i.imgur.com/wSTFkRM.png');
-
-        message.channel.send(exampleEmbed);
+        .addField('Kürzel', shorts, true);
+        message.channel.send(classesEmbed);
     });
+}
+
+
+
+
+function cmd_image(args, message, opt){
+	var max = 3;
+ 
+    if(args.length > 0){
+        var searchText = args.join(" ");
+        if(opt != null){
+        	searchText += " " + opt;
+        }
+        client.search(searchText)
+        .then(images => {
+
+        if(images.length == 0){
+            message.channel.send("No images found!");
+            return "";
+        }
+
+        if(images.length < 3){
+            var max = images.length
+        } 
+        var imgNum = Math.floor((Math.random() * 3));        
+            message.channel.send(images[imgNum].url);
+        });
+    }   
+}
+
+
+function log(message){
+    if(debugMode){
+        console.log(message);
+    }
 }
 
 
